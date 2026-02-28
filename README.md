@@ -55,12 +55,11 @@ Energy accumulators are more accurate than instantaneous power readings
 for computing averages (the firmware uses a 100 ms PID control loop that
 causes instantaneous values to oscillate).
 
-### Temperature (9 zones)
+### Temperature (8 zones)
 
 | Channel | Idle | Description |
 |---------|------|-------------|
 | tj_max | ~31 C | Package Tj max |
-| tj_max_c | ~0 C | Tj max headroom (distance to limit) |
 | cpu_e_clu0 | ~31 C | E-core cluster 0 |
 | cpu_p_clu0 | ~31 C | P-core cluster 0 |
 | cpu_e_clu1 | ~31 C | E-core cluster 1 |
@@ -75,6 +74,7 @@ causes instantaneous values to oscillate).
 |-----------|-------------|
 | prochot | PROCHOT thermal throttle status (0 = normal) |
 | pl_level | Current active power limit level |
+| tj_max_c | Thermal rise above ambient (decidegrees, ~40 idle) |
 
 ### Power Limit Control (hwmon power_cap, read/write)
 

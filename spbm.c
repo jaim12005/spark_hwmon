@@ -93,7 +93,6 @@ static const struct spbm_chan nrg_chans[] = {
 /* Temperature channels (centidegrees C in firmware, millidegrees C in hwmon) */
 static const struct spbm_chan temp_chans[] = {
 	{ "SPBM_PKG_TJ_MAX_OFFSET",							"tj_max" },
-	{ "SPBM_PKG_TJ_MAX_C_OFFSET",						"tj_max_c" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_E_CLU_0_OFFSET",	"cpu_e_clu0" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_P_CLU_0_OFFSET",	"cpu_p_clu0" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_E_CLU_1_OFFSET",	"cpu_e_clu1" },
@@ -106,8 +105,9 @@ static const struct spbm_chan temp_chans[] = {
 
 /* Status registers (dimensionless) exposed as plain sysfs attributes */
 static const struct spbm_chan status_chans[] = {
-	{ "SPBM_PROCHOT_STATUS_OFFSET",		"prochot" },
-	{ "SPBM_PL_CUR_LEVEL_STATUS_OFFSET",		"pl_level" },
+	{ "SPBM_PROCHOT_STATUS_OFFSET",			"prochot" },
+	{ "SPBM_PL_CUR_LEVEL_STATUS_OFFSET",	"pl_level" },
+	{ "SPBM_PKG_TJ_MAX_C_OFFSET",			"tj_max_c" },
 };
 #define N_STATUS ARRAY_SIZE(status_chans)
 
@@ -343,9 +343,21 @@ static ssize_t pl_level_show(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RO(pl_level);
 
+static ssize_t tj_max_c_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct spbm_priv *p = dev_get_drvdata(dev);
+
+	if (p->status_off[2] == OFF_UNKNOWN)
+		return -ENODATA;
+	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[2]));
+}
+static DEVICE_ATTR_RO(tj_max_c);
+
 static struct attribute *spbm_status_attrs[] = {
 	&dev_attr_prochot.attr,
 	&dev_attr_pl_level.attr,
+	&dev_attr_tj_max_c.attr,
 	NULL,
 };
 
