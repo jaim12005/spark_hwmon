@@ -77,12 +77,8 @@ static const struct spbm_chan pwr_chans[] = {
 	{ "SPBM_TE_DLA_OUT_OFFSET",			"dla_out" },
 	{ "SPBM_PL1_VAL_OFFSET",			"pl1" },
 	{ "SPBM_PL2_VAL_OFFSET",			"pl2" },
-	{ "SPBM_PL3_VAL_OFFSET",			"pl3" },
-	{ "SPBM_PL4_VAL_OFFSET",			"pl4" },
 	{ "SPBM_SYSPL1_VAL_OFFSET",			"syspl1" },
 	{ "SPBM_SYSPL2_VAL_OFFSET",			"syspl2" },
-	{ "SPBM_SYSPL3_VAL_OFFSET",			"syspl3" },
-	{ "SPBM_SYSPL4_VAL_OFFSET",			"syspl4" },
 	{ "SPBM_BUDGET_CPU_INST_OFFSET",		"budget_cpu" },
 	{ "SPBM_BUDGET_GPU_INST_OFFSET",		"budget_gpu" },
 	{ "SPBM_BUDGET_CPU_E_INST_OFFSET",		"budget_cpu_e" },
@@ -90,10 +86,8 @@ static const struct spbm_chan pwr_chans[] = {
 	/* EWMA-smoothed power averages per PL controller (mW) */
 	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",		"ewma_pl1" },
 	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",		"ewma_pl2" },
-	{ "SPBM_PWR_AVG_EWMA_S_PL3_OFFSET",		"ewma_pl3" },
 	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",	"ewma_syspl1" },
 	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",	"ewma_syspl2" },
-	{ "SPBM_PWR_AVG_EWMA_S_SYSPL3_OFFSET",	"ewma_syspl3" },
 };
 #define N_PWR ARRAY_SIZE(pwr_chans)
 
