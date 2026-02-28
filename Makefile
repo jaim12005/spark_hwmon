@@ -8,11 +8,11 @@ SIGN_FILE ?= $(KDIR)/scripts/sign-file
 all: modules sign
 
 modules:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(CURDIR) modules
 
 sign: modules
 	@if [ -f "$(MOK_KEY)" ] && [ -f "$(MOK_CERT)" ]; then \
-		sudo $(SIGN_FILE) sha256 $(MOK_KEY) $(MOK_CERT) $(PWD)/spbm.ko && \
+		sudo $(SIGN_FILE) sha256 $(MOK_KEY) $(MOK_CERT) $(CURDIR)/spbm.ko && \
 		echo "Signed spbm.ko"; \
 	else \
 		echo "MOK keys not found, skipping signing"; \
@@ -42,6 +42,6 @@ unload:
 	-sudo rmmod spbm 2>/dev/null
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
 
 .PHONY: all modules sign load unload clean
