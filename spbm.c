@@ -59,25 +59,25 @@ struct spbm_chan {
 
 /* Power channels (mW in firmware, uW in hwmon) */
 static const struct spbm_chan pwr_chans[] = {
-	{ "SPBM_TE_SYS_TOTAL_TELEMETRY_OFFSET",	"sys_total" },
+	{ "SPBM_TE_SYS_TOTAL_TELEMETRY_OFFSET",		"sys_total" },
 	{ "SPBM_TE_SOC_PKG_TELEMETRY_OFFSET",		"soc_pkg" },
 	{ "SPBM_TE_C_AND_G_TELEMETRY_OFFSET",		"cpu_gpu" },
-	{ "SPBM_TE_CPU_P_TELEMETRY_OFFSET",		"cpu_p" },
-	{ "SPBM_TE_CPU_E_TELEMETRY_OFFSET",		"cpu_e" },
-	{ "SPBM_TE_VCORE_TELEMETRY_OFFSET",		"vcore" },
-	{ "SPBM_TE_CHR_TELEMETRY_OFFSET",		"dc_input" },
-	{ "SPBM_TE_TOTAL_GPU_OUT_OFFSET",		"gpu" },
-	{ "SPBM_TE_PREREG_IN_OFFSET",			"prereg" },
-	{ "SPBM_TE_DLA_IN_OFFSET",			"dla" },
+	{ "SPBM_TE_CPU_P_TELEMETRY_OFFSET",			"cpu_p" },
+	{ "SPBM_TE_CPU_E_TELEMETRY_OFFSET",			"cpu_e" },
+	{ "SPBM_TE_VCORE_TELEMETRY_OFFSET",			"vcore" },
+	{ "SPBM_TE_CHR_TELEMETRY_OFFSET",			"dc_input" },
+	{ "SPBM_TE_TOTAL_GPU_OUT_OFFSET",			"gpu" },
+	{ "SPBM_TE_PREREG_IN_OFFSET",				"prereg" },
+	{ "SPBM_TE_DLA_IN_OFFSET",					"dla" },
 	/* PL channels: input = EWMA-smoothed power, cap/max = limits */
-	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",		"pl1" },
-	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",		"pl2" },
-	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",	"syspl1" },
-	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",	"syspl2" },
-	{ "SPBM_BUDGET_CPU_INST_OFFSET",		"budget_cpu" },
-	{ "SPBM_BUDGET_GPU_INST_OFFSET",		"budget_gpu" },
-	{ "SPBM_BUDGET_CPU_E_INST_OFFSET",		"budget_cpu_e" },
-	{ "SPBM_BUDGET_CPU_P_INST_OFFSET",		"budget_cpu_p" },
+	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",			"pl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",			"pl2" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",		"syspl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",		"syspl2" },
+	{ "SPBM_BUDGET_CPU_INST_OFFSET",			"budget_cpu" },
+	{ "SPBM_BUDGET_GPU_INST_OFFSET",			"budget_gpu" },
+	{ "SPBM_BUDGET_CPU_E_INST_OFFSET",			"budget_cpu_e" },
+	{ "SPBM_BUDGET_CPU_P_INST_OFFSET",			"budget_cpu_p" },
 };
 #define N_PWR ARRAY_SIZE(pwr_chans)
 
@@ -92,15 +92,15 @@ static const struct spbm_chan nrg_chans[] = {
 
 /* Temperature channels (centidegrees C in firmware, millidegrees C in hwmon) */
 static const struct spbm_chan temp_chans[] = {
-	{ "SPBM_PKG_TJ_MAX_OFFSET",				"tj_max" },
-	{ "SPBM_PKG_TJ_MAX_C_OFFSET",				"tj_max_c" },
+	{ "SPBM_PKG_TJ_MAX_OFFSET",							"tj_max" },
+	{ "SPBM_PKG_TJ_MAX_C_OFFSET",						"tj_max_c" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_E_CLU_0_OFFSET",	"cpu_e_clu0" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_P_CLU_0_OFFSET",	"cpu_p_clu0" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_E_CLU_1_OFFSET",	"cpu_e_clu1" },
 	{ "SPBM_PKG_THERMAL_ZONE_TEMP_CPU_P_CLU_1_OFFSET",	"cpu_p_clu1" },
-	{ "SPBM_PKG_THERMAL_ZONE_TEMP_GPU_OFFSET",		"gpu" },
-	{ "SPBM_PKG_THERMAL_ZONE_TEMP_SOC_OFFSET",		"soc" },
-	{ "SPBM_PKG_THERMAL_ZONE_TEMP_DLA_OFFSET",		"dla" },
+	{ "SPBM_PKG_THERMAL_ZONE_TEMP_GPU_OFFSET",			"gpu" },
+	{ "SPBM_PKG_THERMAL_ZONE_TEMP_SOC_OFFSET",			"soc" },
+	{ "SPBM_PKG_THERMAL_ZONE_TEMP_DLA_OFFSET",			"dla" },
 };
 #define N_TEMP ARRAY_SIZE(temp_chans)
 
@@ -113,8 +113,8 @@ static const struct spbm_chan status_chans[] = {
 
 /* OS-writable power limit registers (mW) */
 static const struct spbm_chan pl_os_chans[] = {
-	{ "SPBM_PL1_VAL_OS_OFFSET",		"pl1_os" },
-	{ "SPBM_PL2_VAL_OS_OFFSET",		"pl2_os" },
+	{ "SPBM_PL1_VAL_OS_OFFSET",			"pl1_os" },
+	{ "SPBM_PL2_VAL_OS_OFFSET",			"pl2_os" },
 	{ "SPBM_SYSPL1_VAL_OS_OFFSET",		"syspl1_os" },
 	{ "SPBM_SYSPL2_VAL_OS_OFFSET",		"syspl2_os" },
 };
@@ -122,8 +122,8 @@ static const struct spbm_chan pl_os_chans[] = {
 
 /* EC default power limit registers (read-only, for power_max) */
 static const struct spbm_chan pwr_ec_chans[] = {
-	{ "SPBM_PL1_VAL_EC_OFFSET",	"pl1" },
-	{ "SPBM_PL2_VAL_EC_OFFSET",	"pl2" },
+	{ "SPBM_PL1_VAL_EC_OFFSET",		"pl1" },
+	{ "SPBM_PL2_VAL_EC_OFFSET",		"pl2" },
 	{ "SPBM_SYSPL1_VAL_EC_OFFSET",	"syspl1" },
 	{ "SPBM_SYSPL2_VAL_EC_OFFSET",	"syspl2" },
 };
