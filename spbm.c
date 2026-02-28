@@ -29,6 +29,7 @@
 
 #include <linux/module.h>
 #include <linux/hwmon.h>
+#include <linux/hwmon-sysfs.h>
 #include <linux/io.h>
 #include <linux/acpi.h>
 #include <linux/list.h>
@@ -150,6 +151,11 @@ struct spbm_priv {
 	u32 pl_os_off[N_PL_OS];
 	u32 pwr_ec_off[N_PWR_EC];	/* resolved EC offsets (temp for mapping) */
 	u32 pwr_eff_resolve[N_PWR_EFF];	/* resolved effective offsets (temp) */
+	/* Dynamic status sysfs */
+	struct sensor_device_attribute status_sattrs[N_STATUS];
+	struct attribute *status_attrs[N_STATUS + 1];
+	struct attribute_group status_group;
+	const struct attribute_group *extra_groups[2];
 };
 
 /* hwmon callbacks */
@@ -321,45 +327,16 @@ static const struct hwmon_chip_info spbm_chip = {
 
 /* Custom sysfs attributes for dimensionless status registers */
 
-static ssize_t prochot_show(struct device *dev, struct device_attribute *attr,
-			    char *buf)
+static ssize_t spbm_status_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
 	struct spbm_priv *p = dev_get_drvdata(dev);
+	int idx = to_sensor_dev_attr(attr)->index;
 
-	if (p->status_off[0] == OFF_UNKNOWN)
+	if (idx >= N_STATUS || p->status_off[idx] == OFF_UNKNOWN)
 		return -ENODATA;
-	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[0]));
+	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[idx]));
 }
-static DEVICE_ATTR_RO(prochot);
-
-static ssize_t pl_level_show(struct device *dev, struct device_attribute *attr,
-			     char *buf)
-{
-	struct spbm_priv *p = dev_get_drvdata(dev);
-
-	if (p->status_off[1] == OFF_UNKNOWN)
-		return -ENODATA;
-	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[1]));
-}
-static DEVICE_ATTR_RO(pl_level);
-
-static ssize_t tj_max_c_show(struct device *dev, struct device_attribute *attr,
-			     char *buf)
-{
-	struct spbm_priv *p = dev_get_drvdata(dev);
-
-	if (p->status_off[2] == OFF_UNKNOWN)
-		return -ENODATA;
-	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[2]));
-}
-static DEVICE_ATTR_RO(tj_max_c);
-
-static struct attribute *spbm_status_attrs[] = {
-	&dev_attr_prochot.attr,
-	&dev_attr_pl_level.attr,
-	&dev_attr_tj_max_c.attr,
-	NULL,
-};
 
 static umode_t spbm_status_visible(struct kobject *kobj, struct attribute *a,
 				    int idx)
@@ -371,16 +348,6 @@ static umode_t spbm_status_visible(struct kobject *kobj, struct attribute *a,
 		return 0444;
 	return 0;
 }
-
-static const struct attribute_group spbm_status_group = {
-	.attrs = spbm_status_attrs,
-	.is_visible = spbm_status_visible,
-};
-
-static const struct attribute_group *spbm_extra_groups[] = {
-	&spbm_status_group,
-	NULL,
-};
 
 /* ACPI _DSM helpers */
 
@@ -650,9 +617,26 @@ static int spbm_add(struct acpi_device *adev)
 				 pwr_chans[0].label, test);
 	}
 
+	/* Build dynamic status sysfs attributes from status_chans[] */
+	for (i = 0; i < N_STATUS; i++) {
+		struct sensor_device_attribute *sa = &p->status_sattrs[i];
+
+		sa->dev_attr.attr.name = status_chans[i].label;
+		sa->dev_attr.attr.mode = 0444;
+		sa->dev_attr.show = spbm_status_show;
+		sa->index = i;
+		sysfs_attr_init(&sa->dev_attr.attr);
+		p->status_attrs[i] = &sa->dev_attr.attr;
+	}
+	p->status_attrs[N_STATUS] = NULL;
+	p->status_group.attrs = p->status_attrs;
+	p->status_group.is_visible = spbm_status_visible;
+	p->extra_groups[0] = &p->status_group;
+	p->extra_groups[1] = NULL;
+
 	hwdev = devm_hwmon_device_register_with_info(dev, DRIVER_NAME, p,
 						     &spbm_chip,
-						     spbm_extra_groups);
+						     p->extra_groups);
 	if (IS_ERR(hwdev))
 		return PTR_ERR(hwdev);
 
