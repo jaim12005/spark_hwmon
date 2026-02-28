@@ -80,8 +80,8 @@ causes instantaneous values to oscillate).
 
 The `pl1`, `pl2`, `syspl1`, and `syspl2` power channels expose standard
 hwmon `power_cap` (read/write), `power_max`, and `power_min` (read-only)
-attributes, in microwatts. `power_max` shows the EC default limit cached at
-probe (OS limits are reset to ensure correct values). `power_min` is always 0.
+attributes, in microwatts. `power_max` reads the EC default limit directly
+from the firmware's `PL_VAL_EC` registers. `power_min` is always 0.
 `power_cap` shows the effective limit (EC default when no OS override is set).
 Writes above `power_max` are rejected. Write 0 to reset to the EC default.
 
