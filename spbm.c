@@ -12,7 +12,7 @@
  * The SPBM firmware (running on MediaTek SSPM) continuously updates
  * these registers with live power telemetry in milliwatts,
  * cumulative energy counters in millijoules, and thermal zone
- * temperatures in millidegrees Celsius.
+ * temperatures in centidegrees Celsius.
  *
  * This driver binds as an acpi_driver to the NVDA8800 device on the
  * ACPI bus. The device has no platform_device (missing _UID/_STA in
@@ -95,7 +95,7 @@ static const struct spbm_chan nrg_chans[] = {
 };
 #define N_NRG ARRAY_SIZE(nrg_chans)
 
-/* Temperature channels (millidegrees C in both firmware and hwmon) */
+/* Temperature channels (centidegrees C in firmware, millidegrees C in hwmon) */
 static const struct spbm_chan temp_chans[] = {
 	{ "SPBM_PKG_TJ_MAX_OFFSET",				"tj_max" },
 	{ "SPBM_PKG_TJ_MAX_C_OFFSET",				"tj_max_c" },
@@ -159,7 +159,7 @@ static int spbm_read(struct device *dev, enum hwmon_sensor_types type,
 	if (type == hwmon_temp && attr == hwmon_temp_input && ch < N_TEMP &&
 	    p->temp_off[ch] != OFF_UNKNOWN) {
 		raw = ioread32(p->base + p->temp_off[ch]);
-		*val = (long)raw; /* already millidegrees C */
+		*val = (long)raw * 10; /* centidegrees -> millidegrees C */
 		return 0;
 	}
 	return -EOPNOTSUPP;
