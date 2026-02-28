@@ -69,19 +69,15 @@ static const struct spbm_chan pwr_chans[] = {
 	{ "SPBM_TE_TOTAL_GPU_OUT_OFFSET",		"gpu" },
 	{ "SPBM_TE_PREREG_IN_OFFSET",			"prereg" },
 	{ "SPBM_TE_DLA_IN_OFFSET",			"dla" },
-	{ "SPBM_PL1_VAL_OFFSET",			"pl1" },
-	{ "SPBM_PL2_VAL_OFFSET",			"pl2" },
-	{ "SPBM_SYSPL1_VAL_OFFSET",			"syspl1" },
-	{ "SPBM_SYSPL2_VAL_OFFSET",			"syspl2" },
+	/* PL channels: input = EWMA-smoothed power, cap/max = limits */
+	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",		"pl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",		"pl2" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",	"syspl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",	"syspl2" },
 	{ "SPBM_BUDGET_CPU_INST_OFFSET",		"budget_cpu" },
 	{ "SPBM_BUDGET_GPU_INST_OFFSET",		"budget_gpu" },
 	{ "SPBM_BUDGET_CPU_E_INST_OFFSET",		"budget_cpu_e" },
 	{ "SPBM_BUDGET_CPU_P_INST_OFFSET",		"budget_cpu_p" },
-	/* EWMA-smoothed power averages per PL controller (mW) */
-	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",		"ewma_pl1" },
-	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",		"ewma_pl2" },
-	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",	"ewma_syspl1" },
-	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",	"ewma_syspl2" },
 };
 #define N_PWR ARRAY_SIZE(pwr_chans)
 
@@ -124,10 +120,21 @@ static const struct spbm_chan pl_os_chans[] = {
 };
 #define N_PL_OS ARRAY_SIZE(pl_os_chans)
 
+/* Effective power limit registers (for caching EC defaults as power_max) */
+static const struct spbm_chan pwr_eff_chans[] = {
+	{ "SPBM_PL1_VAL_OFFSET",	"pl1" },
+	{ "SPBM_PL2_VAL_OFFSET",	"pl2" },
+	{ "SPBM_SYSPL1_VAL_OFFSET",	"syspl1" },
+	{ "SPBM_SYSPL2_VAL_OFFSET",	"syspl2" },
+};
+#define N_PWR_EFF ARRAY_SIZE(pwr_eff_chans)
+
 struct spbm_priv {
 	void __iomem *base;
 	u32 pwr_off[N_PWR];
 	u32 pwr_cap_off[N_PWR];	/* OS limit for power_cap, or OFF_UNKNOWN */
+	u32 pwr_eff_off[N_PWR_EFF];	/* effective limit offsets (PL_VAL) */
+	u32 pwr_max_mw[N_PWR];		/* cached EC default limits in mW */
 	u32 nrg_off[N_NRG];
 	u32 temp_off[N_TEMP];
 	u32 status_off[N_STATUS];
@@ -148,6 +155,12 @@ static umode_t spbm_visible(const void *data, enum hwmon_sensor_types type,
 	if (type == hwmon_power && attr == hwmon_power_cap && ch < N_PWR &&
 	    p->pwr_cap_off[ch] != OFF_UNKNOWN)
 		return 0644;
+	if (type == hwmon_power && attr == hwmon_power_max && ch < N_PWR &&
+	    p->pwr_max_mw[ch] > 0)
+		return 0444;
+	if (type == hwmon_power && attr == hwmon_power_min && ch < N_PWR &&
+	    p->pwr_cap_off[ch] != OFF_UNKNOWN)
+		return 0444;
 	if (type == hwmon_energy && ch < N_NRG &&
 	    p->nrg_off[ch] != OFF_UNKNOWN &&
 	    (attr == hwmon_energy_input || attr == hwmon_energy_label))
@@ -175,10 +188,19 @@ static int spbm_read(struct device *dev, enum hwmon_sensor_types type,
 		if (attr == hwmon_power_cap &&
 		    p->pwr_cap_off[ch] != OFF_UNKNOWN) {
 			raw = ioread32(p->base + p->pwr_cap_off[ch]);
-			/* If OS limit not set, show effective (EC) limit */
-			if (raw == 0 && p->pwr_off[ch] != OFF_UNKNOWN)
-				raw = ioread32(p->base + p->pwr_off[ch]);
+			/* If OS limit not set, show EC default */
+			if (raw == 0 && p->pwr_max_mw[ch] > 0)
+				raw = p->pwr_max_mw[ch];
 			*val = (long)raw * 1000; /* mW -> uW */
+			return 0;
+		}
+		if (attr == hwmon_power_max && p->pwr_max_mw[ch] > 0) {
+			*val = (long)p->pwr_max_mw[ch] * 1000;
+			return 0;
+		}
+		if (attr == hwmon_power_min &&
+		    p->pwr_cap_off[ch] != OFF_UNKNOWN) {
+			*val = 0;
 			return 0;
 		}
 	}
@@ -222,7 +244,12 @@ static int spbm_write(struct device *dev, enum hwmon_sensor_types type,
 
 	if (type == hwmon_power && attr == hwmon_power_cap && ch < N_PWR &&
 	    p->pwr_cap_off[ch] != OFF_UNKNOWN) {
-		iowrite32((u32)(val / 1000), p->base + p->pwr_cap_off[ch]);
+		u32 mw = (u32)(val / 1000);
+
+		/* Enforce cap <= max (EC default); 0 = reset to default */
+		if (mw > 0 && p->pwr_max_mw[ch] > 0 && mw > p->pwr_max_mw[ch])
+			return -EINVAL;
+		iowrite32(mw, p->base + p->pwr_cap_off[ch]);
 		iowrite32(1, p->base);	/* poke UPDATE_SPBM */
 		return 0;
 	}
@@ -239,7 +266,8 @@ static const struct hwmon_ops spbm_ops = {
 /* Build config arrays with a trailing 0 sentinel */
 
 static const u32 pwr_cfg[N_PWR + 1] = {
-	[0 ... N_PWR - 1] = HWMON_P_INPUT | HWMON_P_LABEL | HWMON_P_CAP,
+	[0 ... N_PWR - 1] = HWMON_P_INPUT | HWMON_P_LABEL | HWMON_P_CAP |
+			    HWMON_P_MAX | HWMON_P_MIN,
 	[N_PWR] = 0,
 };
 
@@ -445,7 +473,11 @@ static int spbm_dsm_resolve_offsets(struct device *dev, acpi_handle handle,
 			    spbm_try_resolve(elem[ni].string.pointer,
 					     elem[oi].integer.value,
 					     pl_os_chans, p->pl_os_off,
-					     N_PL_OS))
+					     N_PL_OS) ||
+			    spbm_try_resolve(elem[ni].string.pointer,
+					     elem[oi].integer.value,
+					     pwr_eff_chans, p->pwr_eff_off,
+					     N_PWR_EFF))
 				resolved++;
 		}
 	}
@@ -473,6 +505,7 @@ static int spbm_add(struct acpi_device *adev)
 	/* Initialize all offsets to "unknown" */
 	memset(p->pwr_off, 0xFF, sizeof(p->pwr_off));
 	memset(p->pwr_cap_off, 0xFF, sizeof(p->pwr_cap_off));
+	memset(p->pwr_eff_off, 0xFF, sizeof(p->pwr_eff_off));
 	memset(p->nrg_off, 0xFF, sizeof(p->nrg_off));
 	memset(p->temp_off, 0xFF, sizeof(p->temp_off));
 	memset(p->status_off, 0xFF, sizeof(p->status_off));
@@ -493,7 +526,8 @@ static int spbm_add(struct acpi_device *adev)
 		return resolved;
 	}
 	dev_info(dev, "resolved %d/%zu register offsets from _DSM\n",
-		 resolved, N_PWR + N_NRG + N_TEMP + N_STATUS + N_PL_OS);
+		 resolved,
+		 N_PWR + N_NRG + N_TEMP + N_STATUS + N_PL_OS + N_PWR_EFF);
 
 	/*
 	 * Map OS power limit offsets to power_cap on matching power channels.
@@ -542,6 +576,30 @@ static int spbm_add(struct acpi_device *adev)
 	p->base = devm_ioremap(dev, phys, SPBM_SIZE);
 	if (!p->base)
 		return -ENOMEM;
+
+	/*
+	 * Cache EC default power limits as power_max.  Force all OS PL
+	 * values to 0 first so PL_VAL reflects the pure EC default,
+	 * then trigger a firmware re-read and cache the results.
+	 */
+	for (i = 0; i < N_PL_OS; i++) {
+		if (p->pl_os_off[i] != OFF_UNKNOWN)
+			iowrite32(0, p->base + p->pl_os_off[i]);
+	}
+	iowrite32(1, p->base);	/* poke UPDATE_SPBM */
+
+	for (i = 0; i < N_PWR_EFF; i++) {
+		if (p->pwr_eff_off[i] == OFF_UNKNOWN)
+			continue;
+		for (j = 0; j < N_PWR; j++) {
+			if (!strcmp(pwr_eff_chans[i].label,
+				   pwr_chans[j].label)) {
+				p->pwr_max_mw[j] = ioread32(p->base +
+							    p->pwr_eff_off[i]);
+				break;
+			}
+		}
+	}
 
 	/* Sanity check: read first power channel if resolved */
 	if (p->pwr_off[0] != OFF_UNKNOWN) {

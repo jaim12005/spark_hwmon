@@ -16,7 +16,7 @@ and thermal zone temperatures in centidegrees Celsius.
 
 ## Sensors
 
-### Power (23 channels)
+### Power (18 channels)
 
 | Channel | Idle | Description |
 |---------|------|-------------|
@@ -30,18 +30,14 @@ and thermal zone temperatures in centidegrees Celsius.
 | gpu | ~5 W | GPU power (matches nvidia-smi) |
 | prereg | ~8 W | Pre-regulator input |
 | dla | ~0.1 W | Deep Learning Accelerator |
-| pl1 | 140 W | PL1 effective power limit |
-| pl2 | 142 W | PL2 effective power limit |
-| syspl1 | 231 W | System PL1 effective limit |
-| syspl2 | 244 W | System PL2 effective limit |
+| pl1 | ~18 W | EWMA power seen by PL1 controller (max=140W, cap=rw) |
+| pl2 | ~18 W | EWMA power seen by PL2 controller (max=142W, cap=rw) |
+| syspl1 | ~26 W | EWMA power seen by SysPL1 controller (max=231W, cap=rw) |
+| syspl2 | ~27 W | EWMA power seen by SysPL2 controller (max=244W, cap=rw) |
 | budget_cpu | 105 W | CPU power budget allocation |
 | budget_gpu | 170 W | GPU power budget allocation |
 | budget_cpu_e | 19 W | E-core power budget allocation |
 | budget_cpu_p | 97 W | P-core power budget allocation |
-| ewma_pl1 | ~17 W | EWMA-smoothed power (PL1 controller) |
-| ewma_pl2 | ~18 W | EWMA-smoothed power (PL2 controller) |
-| ewma_syspl1 | ~26 W | EWMA-smoothed power (SysPL1 controller) |
-| ewma_syspl2 | ~26 W | EWMA-smoothed power (SysPL2 controller) |
 
 ### Energy (4 accumulators)
 
@@ -79,11 +75,12 @@ causes instantaneous values to oscillate).
 
 ### Power Limit Control (hwmon power_cap, read/write)
 
-The `pl1`, `pl2`, `syspl1`, and `syspl2` power channels expose a writable
-`power_cap` attribute (standard hwmon ABI, in microwatts). The firmware takes
-`min(OS, EC)` as the effective limit. Reading `power_cap` returns the current
-effective limit (from the EC when no OS override is set). Write 0 to reset
-to the EC default.
+The `pl1`, `pl2`, `syspl1`, and `syspl2` power channels expose standard
+hwmon `power_cap` (read/write), `power_max`, and `power_min` (read-only)
+attributes, in microwatts. `power_max` shows the EC default limit cached at
+probe (OS limits are reset to ensure correct values). `power_min` is always 0.
+`power_cap` shows the effective limit (EC default when no OS override is set).
+Writes above `power_max` are rejected. Write 0 to reset to the EC default.
 
 Example: limit sustained power to 100W:
 
@@ -104,8 +101,8 @@ Under full load (all 20 cores): ~92 W package, ~64 W CPU_P, ~10.5 W CPU_E.
 ```bash
 sudo apt install dkms
 sudo dkms add .
-sudo dkms build spbm/0.2.0
-sudo dkms install spbm/0.2.0
+sudo dkms build spbm/0.3.0
+sudo dkms install spbm/0.3.0
 ```
 
 The module auto-loads at boot via ACPI modalias matching (`NVDA8800`).
@@ -114,7 +111,7 @@ DKMS automatically rebuilds the module on kernel updates.
 To uninstall:
 
 ```bash
-sudo dkms remove spbm/0.2.0 --all
+sudo dkms remove spbm/0.3.0 --all
 ```
 
 ## Manual Build
