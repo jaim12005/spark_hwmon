@@ -26,7 +26,6 @@ and thermal zone temperatures in centidegrees Celsius.
 | cpu_p | ~0.5 W | P-core cluster (10x Cortex-X925) |
 | cpu_e | ~0.01 W | E-core cluster (10x Cortex-A725) |
 | vcore | ~4 W | Core voltage domain |
-| vddq | 0 W | VDDQ (DRAM voltage, always 0) |
 | dc_input | ~26 W | DC input / charger rail |
 | gpu | ~5 W | GPU power (matches nvidia-smi) |
 | prereg | ~8 W | Pre-regulator input |

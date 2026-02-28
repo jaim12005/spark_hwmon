@@ -65,7 +65,6 @@ static const struct spbm_chan pwr_chans[] = {
 	{ "SPBM_TE_CPU_P_TELEMETRY_OFFSET",		"cpu_p" },
 	{ "SPBM_TE_CPU_E_TELEMETRY_OFFSET",		"cpu_e" },
 	{ "SPBM_TE_VCORE_TELEMETRY_OFFSET",		"vcore" },
-	{ "SPBM_TE_VDDQ_TELEMETRY_OFFSET",		"vddq" },
 	{ "SPBM_TE_CHR_TELEMETRY_OFFSET",		"dc_input" },
 	{ "SPBM_TE_TOTAL_GPU_OUT_OFFSET",		"gpu" },
 	{ "SPBM_TE_PREREG_IN_OFFSET",			"prereg" },
