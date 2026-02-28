@@ -114,7 +114,7 @@ DKMS automatically rebuilds the module on kernel updates.
 To uninstall:
 
 ```bash
-sudo dkms remove spbm/0.3.0 --all
+dkms status spbm | awk -F'[,/]' '{print $2}' | xargs -I{} sudo dkms remove spbm/{} --all
 ```
 
 ## Manual Build
