@@ -666,5 +666,5 @@ static struct acpi_driver spbm_driver = {
 module_acpi_driver(spbm_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("DGX Spark Power Telemetry");
+MODULE_AUTHOR("Antheas Kapenekakis <antheas@cs.aau.dk>");
 MODULE_DESCRIPTION("NVIDIA DGX Spark (GB10) SPBM power hwmon driver");
