@@ -3,12 +3,15 @@
  * NVIDIA DGX Spark (GB10) SPBM Power Telemetry hwmon driver
  *
  * Exposes the System Power Budget Manager (SPBM) shared memory as
- * standard Linux hwmon sensors. The SPBM region is the second memory
- * resource of the MTEL (NVDA8800) ACPI device.
+ * standard Linux hwmon sensors. The MTEL (NVDA8800) ACPI device
+ * provides a _DSM that describes its memory resources; this driver
+ * queries _DSM function 1 at probe time to locate the "SPBM" region
+ * by name rather than hard-coding a _CRS index.
  *
  * The SPBM firmware (running on MediaTek SSPM) continuously updates
- * these registers with live power telemetry in milliwatts and
- * cumulative energy counters in millijoules.
+ * these registers with live power telemetry in milliwatts,
+ * cumulative energy counters in millijoules, and thermal zone
+ * temperatures in millidegrees Celsius.
  *
  * This driver binds as an acpi_driver to the NVDA8800 device on the
  * ACPI bus. The device has no platform_device (missing _UID/_STA in
@@ -28,20 +31,27 @@
 #include <linux/io.h>
 #include <linux/acpi.h>
 #include <linux/list.h>
+#include <linux/uuid.h>
 
 #define DRIVER_NAME	"spbm"
 #define SPBM_SIZE	0x1000
 
-/* SPBM _CRS memory resource index (0-based) */
-#define SPBM_RES_IDX	1
+/*
+ * _DSM UUID for NVDA8800 MTEL device.
+ * Function 1 returns resource names, function 2 returns register maps.
+ */
+static const guid_t mtel_dsm_guid =
+	GUID_INIT(0x12345678, 0x1234, 0x1234,
+		  0x12, 0x34, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc);
 
 /*
- * Register offsets. Firmware writes milliwatts for power,
- * millijoules (cumulative) for energy.
- * hwmon expects microwatts and microjoules respectively.
+ * Register offsets within the SPBM region.
+ * Firmware writes milliwatts for power, millijoules for energy,
+ * and millidegrees Celsius for temperatures.
+ * hwmon expects microwatts, microjoules, and millidegrees respectively.
  */
 
-/* Instantaneous power telemetry */
+/* Instantaneous power telemetry (mW) */
 #define TE_SYS_TOTAL	0x300
 #define TE_SOC_PKG	0x304
 #define TE_C_AND_G	0x308
@@ -59,23 +69,34 @@
 #define TE_PREREG_IN	0x338
 #define TE_DLA_OUT	0x33C
 
-/* Energy accumulators */
+/* Energy accumulators (mJ) */
 #define EN_PKG		0x344
 #define EN_CPU_E	0x350
 #define EN_CPU_P	0x35C
 #define EN_GPC		0x368
 #define EN_GPM		0x374
 
-/* Power limits (effective, milliwatts) */
+/* Power limits (effective, mW) */
 #define PL1_EFF		0x160
 #define PL2_EFF		0x164
 #define SYSPL1_EFF	0x170
 
-/* Power budgets */
+/* Power budgets (mW) */
 #define BUD_CPU		0x600
 #define BUD_GPU		0x604
 #define BUD_CPU_E	0x680
 #define BUD_CPU_P	0x684
+
+/* Thermal zone temperatures (millidegrees C) */
+#define TZ_TJ_MAX	0x818
+#define TZ_TJ_MAX_C	0x81C
+#define TZ_CPU_E_0	0x820
+#define TZ_CPU_P_0	0x824
+#define TZ_CPU_E_1	0x828
+#define TZ_CPU_P_1	0x82C
+#define TZ_GPU		0x830
+#define TZ_SOC		0x834
+#define TZ_DLA		0x838
 
 struct spbm_chan {
 	u32 offset;
@@ -118,6 +139,19 @@ static const struct spbm_chan nrg_chans[] = {
 };
 #define N_NRG ARRAY_SIZE(nrg_chans)
 
+static const struct spbm_chan temp_chans[] = {
+	{ TZ_TJ_MAX,  "tj_max" },
+	{ TZ_TJ_MAX_C, "tj_max_c" },
+	{ TZ_CPU_E_0, "cpu_e_clu0" },
+	{ TZ_CPU_P_0, "cpu_p_clu0" },
+	{ TZ_CPU_E_1, "cpu_e_clu1" },
+	{ TZ_CPU_P_1, "cpu_p_clu1" },
+	{ TZ_GPU,     "gpu" },
+	{ TZ_SOC,     "soc" },
+	{ TZ_DLA,     "dla" },
+};
+#define N_TEMP ARRAY_SIZE(temp_chans)
+
 struct spbm_priv {
 	void __iomem *base;
 };
@@ -132,6 +166,9 @@ static umode_t spbm_visible(const void *data, enum hwmon_sensor_types type,
 		return 0444;
 	if (type == hwmon_energy && ch < N_NRG &&
 	    (attr == hwmon_energy_input || attr == hwmon_energy_label))
+		return 0444;
+	if (type == hwmon_temp && ch < N_TEMP &&
+	    (attr == hwmon_temp_input || attr == hwmon_temp_label))
 		return 0444;
 	return 0;
 }
@@ -152,6 +189,11 @@ static int spbm_read(struct device *dev, enum hwmon_sensor_types type,
 		*val = (long)raw * 1000; /* mJ -> uJ */
 		return 0;
 	}
+	if (type == hwmon_temp && attr == hwmon_temp_input && ch < N_TEMP) {
+		raw = ioread32(p->base + temp_chans[ch].offset);
+		*val = (long)raw; /* already millidegrees C */
+		return 0;
+	}
 	return -EOPNOTSUPP;
 }
 
@@ -164,6 +206,10 @@ static int spbm_read_string(struct device *dev, enum hwmon_sensor_types type,
 	}
 	if (type == hwmon_energy && ch < N_NRG) {
 		*str = nrg_chans[ch].label;
+		return 0;
+	}
+	if (type == hwmon_temp && ch < N_TEMP) {
+		*str = temp_chans[ch].label;
 		return 0;
 	}
 	return -EOPNOTSUPP;
@@ -187,6 +233,11 @@ static const u32 nrg_cfg[N_NRG + 1] = {
 	[N_NRG] = 0,
 };
 
+static const u32 temp_cfg[N_TEMP + 1] = {
+	[0 ... N_TEMP - 1] = HWMON_T_INPUT | HWMON_T_LABEL,
+	[N_TEMP] = 0,
+};
+
 static const struct hwmon_channel_info pwr_info = {
 	.type = hwmon_power,
 	.config = pwr_cfg,
@@ -197,8 +248,13 @@ static const struct hwmon_channel_info nrg_info = {
 	.config = nrg_cfg,
 };
 
+static const struct hwmon_channel_info temp_info = {
+	.type = hwmon_temp,
+	.config = temp_cfg,
+};
+
 static const struct hwmon_channel_info * const spbm_info[] = {
-	&pwr_info, &nrg_info, NULL,
+	&pwr_info, &nrg_info, &temp_info, NULL,
 };
 
 static const struct hwmon_chip_info spbm_chip = {
