@@ -1,12 +1,15 @@
-# SPBM - DGX Spark Power Telemetry hwmon Driver
+# SPBM - DGX Spark Power Telemetry & Control hwmon Driver
 
 Linux hwmon driver for the NVIDIA DGX Spark (GB10 SoC) that exposes
-full system power telemetry via standard `sensors` / sysfs interfaces.
+full system power telemetry and power limit controls via standard
+`sensors` / sysfs interfaces.
 
 The driver reads the System Power Budget Manager (SPBM) shared memory,
 which is continuously updated by the MediaTek SSPM firmware with live
 power readings in milliwatts, cumulative energy counters in millijoules,
-and thermal zone temperatures in centidegrees Celsius.
+and thermal zone temperatures in centidegrees Celsius. Writable
+`power_cap` attributes allow setting OS-level power limits (PL1, PL2,
+SysPL1, SysPL2).
 
 > [!NOTE]
 > NVIDIA has [officially stated](https://forums.developer.nvidia.com/t/help-needed-how-to-enable-grace-cpu-power-telemetry-on-dgx-spark-gb10/360631) there is "no method to monitor CPU power" on the DGX Spark.
