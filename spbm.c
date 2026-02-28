@@ -77,11 +77,23 @@ static const struct spbm_chan pwr_chans[] = {
 	{ "SPBM_TE_DLA_OUT_OFFSET",			"dla_out" },
 	{ "SPBM_PL1_VAL_OFFSET",			"pl1" },
 	{ "SPBM_PL2_VAL_OFFSET",			"pl2" },
+	{ "SPBM_PL3_VAL_OFFSET",			"pl3" },
+	{ "SPBM_PL4_VAL_OFFSET",			"pl4" },
 	{ "SPBM_SYSPL1_VAL_OFFSET",			"syspl1" },
+	{ "SPBM_SYSPL2_VAL_OFFSET",			"syspl2" },
+	{ "SPBM_SYSPL3_VAL_OFFSET",			"syspl3" },
+	{ "SPBM_SYSPL4_VAL_OFFSET",			"syspl4" },
 	{ "SPBM_BUDGET_CPU_INST_OFFSET",		"budget_cpu" },
 	{ "SPBM_BUDGET_GPU_INST_OFFSET",		"budget_gpu" },
 	{ "SPBM_BUDGET_CPU_E_INST_OFFSET",		"budget_cpu_e" },
 	{ "SPBM_BUDGET_CPU_P_INST_OFFSET",		"budget_cpu_p" },
+	/* EWMA-smoothed power averages per PL controller (mW) */
+	{ "SPBM_PWR_AVG_EWMA_S_PL1_OFFSET",		"ewma_pl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_PL2_OFFSET",		"ewma_pl2" },
+	{ "SPBM_PWR_AVG_EWMA_S_PL3_OFFSET",		"ewma_pl3" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL1_OFFSET",	"ewma_syspl1" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL2_OFFSET",	"ewma_syspl2" },
+	{ "SPBM_PWR_AVG_EWMA_S_SYSPL3_OFFSET",	"ewma_syspl3" },
 };
 #define N_PWR ARRAY_SIZE(pwr_chans)
 
@@ -109,11 +121,19 @@ static const struct spbm_chan temp_chans[] = {
 };
 #define N_TEMP ARRAY_SIZE(temp_chans)
 
+/* Status registers (dimensionless) exposed as plain sysfs attributes */
+static const struct spbm_chan status_chans[] = {
+	{ "SPBM_PROCHOT_STATUS_OFFSET",		"prochot" },
+	{ "SPBM_PL_CUR_LEVEL_STATUS_OFFSET",		"pl_level" },
+};
+#define N_STATUS ARRAY_SIZE(status_chans)
+
 struct spbm_priv {
 	void __iomem *base;
 	u32 pwr_off[N_PWR];
 	u32 nrg_off[N_NRG];
 	u32 temp_off[N_TEMP];
+	u32 status_off[N_STATUS];
 };
 
 /* hwmon callbacks */
@@ -230,6 +250,57 @@ static const struct hwmon_chip_info spbm_chip = {
 	.info = spbm_info,
 };
 
+/* Custom sysfs attributes for dimensionless status registers */
+
+static ssize_t prochot_show(struct device *dev, struct device_attribute *attr,
+			    char *buf)
+{
+	struct spbm_priv *p = dev_get_drvdata(dev);
+
+	if (p->status_off[0] == OFF_UNKNOWN)
+		return -ENODATA;
+	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[0]));
+}
+static DEVICE_ATTR_RO(prochot);
+
+static ssize_t pl_level_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct spbm_priv *p = dev_get_drvdata(dev);
+
+	if (p->status_off[1] == OFF_UNKNOWN)
+		return -ENODATA;
+	return sysfs_emit(buf, "%u\n", ioread32(p->base + p->status_off[1]));
+}
+static DEVICE_ATTR_RO(pl_level);
+
+static struct attribute *spbm_status_attrs[] = {
+	&dev_attr_prochot.attr,
+	&dev_attr_pl_level.attr,
+	NULL,
+};
+
+static umode_t spbm_status_visible(struct kobject *kobj, struct attribute *a,
+				    int idx)
+{
+	struct device *dev = kobj_to_dev(kobj);
+	struct spbm_priv *p = dev_get_drvdata(dev);
+
+	if (idx < N_STATUS && p->status_off[idx] != OFF_UNKNOWN)
+		return 0444;
+	return 0;
+}
+
+static const struct attribute_group spbm_status_group = {
+	.attrs = spbm_status_attrs,
+	.is_visible = spbm_status_visible,
+};
+
+static const struct attribute_group *spbm_extra_groups[] = {
+	&spbm_status_group,
+	NULL,
+};
+
 /* ACPI _DSM helpers */
 
 /*
@@ -339,7 +410,11 @@ static int spbm_dsm_resolve_offsets(struct device *dev, acpi_handle handle,
 					     nrg_chans, p->nrg_off, N_NRG) ||
 			    spbm_try_resolve(elem[ni].string.pointer,
 					     elem[oi].integer.value,
-					     temp_chans, p->temp_off, N_TEMP))
+					     temp_chans, p->temp_off, N_TEMP) ||
+			    spbm_try_resolve(elem[ni].string.pointer,
+					     elem[oi].integer.value,
+					     status_chans, p->status_off,
+					     N_STATUS))
 				resolved++;
 		}
 	}
@@ -368,6 +443,7 @@ static int spbm_add(struct acpi_device *adev)
 	memset(p->pwr_off, 0xFF, sizeof(p->pwr_off));
 	memset(p->nrg_off, 0xFF, sizeof(p->nrg_off));
 	memset(p->temp_off, 0xFF, sizeof(p->temp_off));
+	memset(p->status_off, 0xFF, sizeof(p->status_off));
 
 	/* Ask _DSM which _CRS resource is "SPBM" */
 	spbm_idx = spbm_dsm_find_resource(adev->handle, "SPBM");
@@ -384,7 +460,7 @@ static int spbm_add(struct acpi_device *adev)
 		return resolved;
 	}
 	dev_info(dev, "resolved %d/%zu register offsets from _DSM\n",
-		 resolved, N_PWR + N_NRG + N_TEMP);
+		 resolved, N_PWR + N_NRG + N_TEMP + N_STATUS);
 
 	/* Walk _CRS to find the memory resource at that index */
 	INIT_LIST_HEAD(&res_list);
@@ -427,7 +503,8 @@ static int spbm_add(struct acpi_device *adev)
 	}
 
 	hwdev = devm_hwmon_device_register_with_info(dev, DRIVER_NAME, p,
-						     &spbm_chip, NULL);
+						     &spbm_chip,
+						     spbm_extra_groups);
 	if (IS_ERR(hwdev))
 		return PTR_ERR(hwdev);
 
