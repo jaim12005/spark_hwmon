@@ -17,6 +17,12 @@ SysPL1, SysPL2).
 > [!WARNING]
 > This driver is vibe coded. Thanks Claude.
 
+> [!WARNING]
+> Update your BIOS with `fwupd` (`sudo fwupdmgr refresh && sudo fwupdmgr update`).
+> Older firmware versions may report incorrect values for the CPU power channels.
+> The SPBM interface is still in flux — if you notice incorrect or missing measurements,
+> please [open an issue](https://github.com/antheas/spark_hwmon/issues).
+
 ## Sensors
 
 ### Power (14 channels)
