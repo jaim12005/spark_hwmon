@@ -537,11 +537,20 @@ static int spbm_add(struct acpi_device *adev)
 		return spbm_idx;
 	}
 
-	/* Resolve register offsets from _DSM function 2 */
-	resolved = spbm_dsm_resolve_offsets(dev, adev->handle, spbm_idx, p);
-	if (resolved < 0) {
-		dev_err(dev, "_DSM register map query failed (%d)\n", resolved);
-		return resolved;
+	/*
+	 * Resolve register offsets from _DSM function 2.
+	 * The sub-index for function 2 does not necessarily match the
+	 * resource index from function 1 (e.g. "SPBM" may be resource 0
+	 * but its register map lives under function 2 sub-index 1).
+	 * Try all sub-indices and accumulate resolved offsets.
+	 */
+	resolved = 0;
+	for (i = 0; i < 16; i++) {
+		ret = spbm_dsm_resolve_offsets(dev, adev->handle, i, p);
+		if (ret == -ENODEV)
+			break;	/* _DSM call itself failed; no more indices */
+		if (ret > 0)
+			resolved += ret;
 	}
 	dev_info(dev, "resolved %d/%zu register offsets from _DSM\n",
 		 resolved,
